@@ -1,6 +1,7 @@
 import gdal
 import numpy as np
 import subprocess
+from rasterstats import zonal_stats
 import matplotlib as mpl
 from matplotlib import cm as cm
 
@@ -50,10 +51,12 @@ def export_tif(image, ref_tif, outname, bands=None, dtype=gdal.GDT_Float32, meta
         return(print('created %s'%(outname)))
 
 class Image:
-    def __init__(self, fname, outname, tilesdir, fake_t=False, zoom=[1,20], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
+    def __init__(self, fname, outname, tilesdir, shapefile="", fake_t=False, zoom=[1,20], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
         self.file_name = fname 
         self.outname = outname
         self.tiles_dir = tilesdir
+        if shapefile:
+            self.shapefile = shapefile
         self.fake_t = fake_t
         self.zoom = zoom
         self.cmap = cmap 
@@ -69,9 +72,14 @@ class Image:
             self.moveaxis()
         self.make_mappable()
 
+    def make_vector_summary(self):
+        self.stats = zonal_stats(self.shapefile, self.outname, geojson_out=True)
+
     def main(self):
         self.manipulate_array()
         export_tif(self.map, self.file_name, self.outname, bands=4, dtype=gdal.GDT_Byte)
+        if shapefile:
+            self.make_vector_summary()
         self.make_tiles()
 
     def bands_firstlast(self):
@@ -107,6 +115,7 @@ if __name__ == "__main__":
     fname = '/data/HYP_LR/HYP_LR.tif' 
     outname = 'topo_remapped.tif'
     tilesdir = 'topo_tiles'
+    shapefile = 'countries'
     my_im = Image(fname, outname, tilesdir, fake_t=True) 
     my_im.main()
 
