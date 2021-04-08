@@ -1,7 +1,6 @@
 import gdal
 import numpy as np
 import subprocess
-from rasterstats import zonal_stats
 import matplotlib as mpl
 from matplotlib import cm as cm
 
@@ -51,12 +50,10 @@ def export_tif(image, ref_tif, outname, bands=None, dtype=gdal.GDT_Float32, meta
         return(print('created %s'%(outname)))
 
 class Image:
-    def __init__(self, fname, outname, tilesdir, shapefile="", fake_t=False, zoom=[1,20], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
+    def __init__(self, fname, outname, tilesdir, fake_t=False, zoom=[0,13], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
         self.file_name = fname 
         self.outname = outname
         self.tiles_dir = tilesdir
-        if shapefile:
-            self.shapefile = shapefile
         self.fake_t = fake_t
         self.zoom = zoom
         self.cmap = cmap 
@@ -70,16 +67,14 @@ class Image:
             self.add_fake_transparency()
         if self.band_position == 0:
             self.moveaxis()
+        if self.band_position == -1:
+            self.array = self.array[:,:,np.newaxis]
+            self.array = np.stack([self.array[:,:,0], self.array[:,:,0], self.array[:,:,0]], axis=-1)
         self.make_mappable()
-
-    def make_vector_summary(self):
-        self.stats = zonal_stats(self.shapefile, self.outname, geojson_out=True)
 
     def main(self):
         self.manipulate_array()
         export_tif(self.map, self.file_name, self.outname, bands=4, dtype=gdal.GDT_Byte)
-        if shapefile:
-            self.make_vector_summary()
         self.make_tiles()
 
     def bands_firstlast(self):
@@ -87,6 +82,8 @@ class Image:
             return 0
         elif self.shape[-1] < 5:
             return 2
+        elif self.array.ndim == 2:
+            return -1
 
     def add_fake_transparency(self):
         if self.band_position == 0:
@@ -104,18 +101,21 @@ class Image:
     def make_mappable(self):
         norm = mpl.colors.BoundaryNorm(self.bounds, self.cmap.N)
         m = cm.ScalarMappable(norm=norm, cmap=self.cmap)
-        self.map = (m.to_rgba(self.array)*255).astype('uint8')
+        self.map = (255*m.to_rgba(self.array/self.array.max())).astype('uint8')
 
     def make_tiles(self):
-        tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles-multiprocess.py -l -p raster -z {self.zoom[0]}-{self.zoom[1]} -w none {self.outname} {self.tiles_dir}"
+        tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {self.zoom[0]}-{self.zoom[1]} {self.outname} {self.tiles_dir}"
         p = subprocess.Popen(tile_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         p.communicate()
 
-if __name__ == "__main__":
-    fname = '/data/HYP_LR/HYP_LR.tif' 
-    outname = 'topo_remapped.tif'
-    tilesdir = 'topo_tiles'
-    shapefile = 'countries'
-    my_im = Image(fname, outname, tilesdir, fake_t=True) 
+def main(file_stem):
+    fname = f'/data/placer/tif/{file_stem}.tif' 
+    outname = f'{file_stem}_remapped.tif'
+    tilesdir = f'{file_stem}_tiles'
+    my_im = Image(fname, outname, tilesdir) 
     my_im.main()
+    return my_im
+
+if __name__ == "__main__":
+    main('2005_biomass')
 
