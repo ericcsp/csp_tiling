@@ -1,6 +1,9 @@
 FROM ubuntu:20.04
 
-RUN apt-get update && apt-get install git python3 python3-matplotlib
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update -yq && apt-get install -yq git python3 python3-matplotlib
 
 RUN mkdir -p /content && cd /content && git clone https://github.com/commenthol/gdal2tiles-leaflet/
 
