@@ -50,11 +50,10 @@ def export_tif(image, ref_tif, outname, bands=None, dtype=gdal.GDT_Float32, meta
         return(print('created %s'%(outname)))
 
 class Image:
-    def __init__(self, fname, outname, tilesdir, fake_t=False, zoom=[0,13], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
+    def __init__(self, fname, outname, tilesdir, zoom=[0,13], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
         self.file_name = fname 
         self.outname = outname
         self.tiles_dir = tilesdir
-        self.fake_t = fake_t
         self.zoom = zoom
         self.cmap = cmap 
         self.bounds = bounds
@@ -63,13 +62,10 @@ class Image:
         self.array = gdal.Open(self.file_name).ReadAsArray()
         self.shape = self.array.shape
         self.band_position = self.bands_firstlast()
-        if self.fake_t:
-            self.add_fake_transparency()
         if self.band_position == 0:
             self.moveaxis()
-        if self.band_position == -1:
-            self.array = self.array[:,:,np.newaxis]
-            self.array = np.stack([self.array[:,:,0], self.array[:,:,0], self.array[:,:,0]], axis=-1)
+        if self.band_position > -1:
+            self.array = np.squeeze(self.array)
         self.make_mappable()
 
     def main(self):
@@ -78,20 +74,12 @@ class Image:
         self.make_tiles()
 
     def bands_firstlast(self):
-        if self.shape[0] < 5:
+        if self.shape[0] < 2:
             return 0
-        elif self.shape[-1] < 5:
+        elif self.shape[-1] < 2:
             return 2
         elif self.array.ndim == 2:
             return -1
-
-    def add_fake_transparency(self):
-        if self.band_position == 0:
-            new_array = np.stack([self.array[0,:,:], self.array[1,:,:], self.array[2,:,:], self.array[0,:,:]])
-        else:
-            new_array = np.stack([self.array[:,:,0], self.array[:,:,1], self.array[:,:,2], self.array[:,:,0]])
-        self.array = new_array
-        del new_array
 
     def moveaxis(self):
         my_im = np.moveaxis(self.array, 0, -1)
@@ -101,7 +89,7 @@ class Image:
     def make_mappable(self):
         norm = mpl.colors.BoundaryNorm(self.bounds, self.cmap.N)
         m = cm.ScalarMappable(norm=norm, cmap=self.cmap)
-        self.map = (255*m.to_rgba(self.array/self.array.max())).astype('uint8')
+        self.map = m.to_rgba((self.array/self.array.max()), bytes=True, norm=False)
 
     def make_tiles(self):
         tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {self.zoom[0]}-{self.zoom[1]} {self.outname} {self.tiles_dir}"
