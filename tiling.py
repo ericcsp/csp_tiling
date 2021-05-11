@@ -1,109 +1,57 @@
-import gdal
-import numpy as np
+import rasterio
 import subprocess
 import matplotlib as mpl
 from matplotlib import cm as cm
 
-def export_tif(image, ref_tif, outname, bands=None, dtype=gdal.GDT_Float32, metadata=None, bandmeta=None, rasterdriver='GTiff', verbose=True):
-    '''
-    Input a numpy array image and a reference geotif 
-    to convert image to geotiff of same geotransform
-    and projection. Note, if alpha_mask is not None,
-    creates a 4 channel geotiff (alpha as last channel)
-    Parameters:
-    -----------
-    image - 3D <numpy array>
-    ref_tif - Geotiff reference <str> filename or <gdal object> of same dimensions
-    outname - <str> file name to output to (use .tif extension)
-    dtype - <str> denoting data type for GeoTiff. Defaults to 8 bit image,
-    but can use gdal.GDT_Float32
-    '''
-    if type(ref_tif) is not gdal.Dataset:
-        ref_tif = gdal.Open(ref_tif)
-    gt = ref_tif.GetGeoTransform()
-    proj = ref_tif.GetProjection()
-    xsize = np.shape(image)[1] 
-    ysize = np.shape(image)[0] 
-    if bands is None:
-        bands = ref_tif.RasterCount 
-    driver = gdal.GetDriverByName(rasterdriver)
-    out = driver.Create(outname, xsize, ysize, bands, dtype)
-    out.SetGeoTransform(gt)
-    out.SetProjection(proj)
-    if metadata is not None:
-        out.SetMetadata(metadata)
-    if bands == 1:
-        band = out.GetRasterBand(1)
-        band.WriteArray(image)
-        if bandmeta is not None:
-            band.SetMetadata(bandmeta) 
-            band.SetDescription(bandmeta)
-    else:
-        for i in range(bands):
-            band = out.GetRasterBand(i+1)
-            band.WriteArray(image[:,:,i]) #if we want a red image for a 4 channel
-            if bandmeta is not None:
-                band.SetMetadata(bandmeta[i]) 
-                band.SetDescription(bandmeta[i])
-    out = None
-    if verbose:
-        return(print('created %s'%(outname)))
-
-class Image:
-    def __init__(self, fname, outname, tilesdir, zoom=[0,13], cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
+class RGBTiff:
+    def __init__(self, fname, outname, cmap=cm.get_cmap('viridis', 7), bounds=[0,1,5,10,20,50,100]):
         self.file_name = fname 
         self.outname = outname
-        self.tiles_dir = tilesdir
-        self.zoom = zoom
         self.cmap = cmap 
         self.bounds = bounds
 
     def manipulate_array(self):
-        self.array = gdal.Open(self.file_name).ReadAsArray()
-        self.shape = self.array.shape
-        self.band_position = self.bands_firstlast()
-        if self.band_position == 0:
-            self.moveaxis()
-        if self.band_position > -1:
-            self.array = np.squeeze(self.array)
+        self.dataset = rasterio.open(self.file_name)
+        self.array = self.dataset.read(1)
         self.make_mappable()
 
     def main(self):
         self.manipulate_array()
-        export_tif(self.map, self.file_name, self.outname, bands=4, dtype=gdal.GDT_Byte)
-        self.make_tiles()
-
-    def bands_firstlast(self):
-        if self.shape[0] < 2:
-            return 0
-        elif self.shape[-1] < 2:
-            return 2
-        elif self.array.ndim == 2:
-            return -1
-
-    def moveaxis(self):
-        my_im = np.moveaxis(self.array, 0, -1)
-        self.array = my_im
-        del my_im
+        export_tif(self.map, self.file_name, self.outname)
+        self.dataset.close()
 
     def make_mappable(self):
         norm = mpl.colors.BoundaryNorm(self.bounds, self.cmap.N)
         m = cm.ScalarMappable(norm=norm, cmap=self.cmap)
         self.map = m.to_rgba((self.array/self.array.max()), bytes=True, norm=False)
 
-    def make_tiles(self):
-        tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {self.zoom[0]}-{self.zoom[1]} {self.outname} {self.tiles_dir}"
-        p = subprocess.Popen(tile_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        p.communicate()
+    def export_tif(self):
+        out_meta = self.dataset.meta.copy()
+        out_meta.update({"compress": "lzw"})
+        with rasterio.open(self.outname, 'w', **out_meta) as dest:
+            dest.write(self.map)
 
-def main(file_stem):
+def make_tiles(outname, tilesdir, zoom=[0,13]):
+    tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {zoom[0]}-{zoom[1]} {outname} {tiles_dir}"
+    p = subprocess.Popen(tile_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    p.communicate()
+
+def main(file_stem, with_tiles=False):
     fname = f'/data/placer/tif/{file_stem}.tif' 
-    outname = f'{file_stem}_remapped.tif'
-    tilesdir = f'{file_stem}_tiles'
-    my_im = Image(fname, outname, tilesdir) 
-    my_im.main()
-    return my_im
+    outname = f'/data/{file_stem}_remapped.tif'
+    tilesdir = f'/data/{file_stem}_tiles'
+    my_rgb = RGBTiff(fname, outname, tilesdir) 
+    my_rgb.main()
+    return my_rgb
+    if with_tiles:
+        make_tiles(outname, tilesdir) 
 
 if __name__ == "__main__":
-    main('2005_biomass')
+    for yr in ['2005', '2020']:
+        for var in ['ba', 'biomass', 'canopycover']:
+            if '2005' in yr and 'biomass' in var:
+                continue
+            else:
+                out = main(f'{yr}_{var}')
+                del out
 
