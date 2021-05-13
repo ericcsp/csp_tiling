@@ -17,41 +17,44 @@ class RGBTiff:
 
     def main(self):
         self.manipulate_array()
-        export_tif(self.map, self.file_name, self.outname)
+        self.export_tif()
         self.dataset.close()
 
     def make_mappable(self):
         norm = mpl.colors.BoundaryNorm(self.bounds, self.cmap.N)
         m = cm.ScalarMappable(norm=norm, cmap=self.cmap)
         self.map = m.to_rgba((self.array/self.array.max()), bytes=True, norm=False)
+        mask = self.array > 0.001
+        self.map[...,-1] = 255*mask
 
     def export_tif(self):
         out_meta = self.dataset.meta.copy()
-        out_meta.update({"compress": "lzw"})
+        out_meta.update({"count": 4, "dtype": "uint8", "compress": "lzw"})
         with rasterio.open(self.outname, 'w', **out_meta) as dest:
-            dest.write(self.map)
+            for i in range(4):
+                dest.write(self.map[:,:,i], i+1)
 
 def make_tiles(outname, tilesdir, zoom=[0,13]):
-    tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {zoom[0]}-{zoom[1]} {outname} {tiles_dir}"
+    tile_cmd = f"python3 gdal2tiles-leaflet/gdal2tiles.py -z {zoom[0]}-{zoom[1]} {outname} {tilesdir}"
     p = subprocess.Popen(tile_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     p.communicate()
 
 def main(file_stem, with_tiles=False):
-    fname = f'/data/placer/tif/{file_stem}.tif' 
-    outname = f'/data/{file_stem}_remapped.tif'
-    tilesdir = f'/data/{file_stem}_tiles'
-    my_rgb = RGBTiff(fname, outname, tilesdir) 
+    year, region, variable = file_stem.split('_')
+    fname = f'/data/hls_output_2021-05-13/{year}/{variable}/{file_stem}.tif' 
+    outname = f'/data/hls_output_2021-05-13/{year}/{variable}/{file_stem}_remapped.tif' 
+    tilesdir = f'/data/tiles_{region}/{year}/{variable}/{file_stem}_tiles'
+    my_rgb = RGBTiff(fname, outname) 
     my_rgb.main()
-    return my_rgb
     if with_tiles:
         make_tiles(outname, tilesdir) 
+    return my_rgb
 
 if __name__ == "__main__":
-    for yr in ['2005', '2020']:
-        for var in ['ba', 'biomass', 'canopycover']:
-            if '2005' in yr and 'biomass' in var:
-                continue
-            else:
-                out = main(f'{yr}_{var}')
-                del out
+    for yr in ['2016', '2018']:
+        for var in ['biomass', 'basalarea', 'canopycover']:
+            #my_main = 
+            main(f'{yr}_California_{var}', with_tiles=False)
+            #del my_main
+
 
