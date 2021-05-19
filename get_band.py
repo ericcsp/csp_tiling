@@ -2,10 +2,11 @@ import rasterio
 import os
 
 class Full_Img:
-    def __init__(self, fname):
+    def __init__(self, fname, **kw):
         self.fname = fname
         self.img = rasterio.open(self.fname)
-        self.bands = {1: "classtype", 2: "basalarea", 3: "biomass", 4: "canopycover"}
+        self.bands = kw["bands"]
+        self.year = kw["this_yr"]
         self.children = {}
 
     def make_children(self):
@@ -26,24 +27,13 @@ class Band_Img:
         self.index = index
         self.band_name = band_name
         self.parent = parent
+        self.meta = self.parent.img.meta.copy()
         self.data = self.parent.img.read(self.index)
-        self.outname = f'{self.band_name}/{self.parent.fname[:-4]}_{self.band_name}.tif'
+        self.scale = self.parent.img.scales[self.index-1]
+        self.outname = f'{kw["local_folder"}/{self.parent.year}/{self.band_name}/{self.parent.fname[:-4]}_{self.band_name}.tif'
 
     def newimg(self):
-        with rasterio.open(
-                 self.outname,
-                 'w',
-                 driver='GTiff',
-                 height=self.parent.img.height,
-                 width=self.parent.img.width,
-                 count=1,
-                 dtype=self.data.dtype,
-                 crs=self.parent.img.crs,
-                 transform=self.parent.img.transform) as band_write:
-            band_write.write(self.data, 1)
-
-if __name__ == "__main__":
-    all_files = [fil for fil in os.listdir('.') if '.tif' in fil]
-    for my_fil in all_files:
-        my_img = Full_Img(my_fil)
-        my_img.main()
+        self.meta.update({"count": 1, "dtype": self.data.dtype,
+            "compress": "lzw"})
+        with rasterio.open(self.outname, 'w', **self.meta) as band_write:
+            band_write.write(self.scale*self.data, 1)

@@ -1,37 +1,38 @@
+import os
 import subprocess
 import yaml
-result = subprocess.run(['az',
+
+def list_files(**kw):
+  result = subprocess.run(['az',
                          'storage',
                          'blob',
                          'list',
                          '--prefix',
-                         'hls_output_2021-05-13',
+                         f'{kw["src_folder"]}{kw["src_prefix"]}',
                          '--output',
                          'yaml',
                          '--account-name',
-                         'usfs',
+                         kw['account'],
                          '-c',
-                         'fia',
+                         kw['src_container'],
                          '--account-key',
-                         '<redacted>'], stdout=subprocess.PIPE)
-files = [fil["name"] for fil in yaml.safe_load(result.stdout)]
+                         os.env['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
+  return [fil["name"] for fil in yaml.safe_load(result.stdout)]
 
-def main():
+def get_files(**kw):
+  files = list_files(**kw)
   for fil in files:
-    result2 = subprocess.run(['az',
+    result = subprocess.run(['az',
                               'storage',
                               'blob',
                               'download',
                               '-f',
-                              fil,
+                              fil.replace(kw["src_folder"], kw["local_folder"],
                               '-n',
                               fil,
                               '--account-name',
-                              'usfs',
+                              kw['account'],
                               '-c',
-                              'fia',
+                              kw['src_container'],
                               '--account-key',
-                              '<redacted>'], stdout=subprocess.PIPE)
-
-if __name__ == "__main__":
-  main()
+                              os.env['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)

@@ -1,6 +1,4 @@
 imagename=cspinc/tiling:latest
-datadir=$1
-#if [[ "$(docker images -q $imagename 2> /dev/null)" == "" ]]; then
-  docker build . -t $imagename
-#fi
-docker run -d -it -v $(pwd):/content/csp_tiling -v /home/cspadmin/data:/data --name tile_container $imagename
+mkdir -p $HOME/csptiling_data
+docker build . -t $imagename
+docker run -d -it -v $(pwd):/content/csp_tiling -v $HOME/csptiling_data:/data --name tile_container $imagename

@@ -1,0 +1,35 @@
+account: usfs
+src_container: fia
+dst_container: app
+src_folder: hls_output_2021-05-13
+local_folder: /data/hls_test
+src_prefix: /2016_10U
+#src_prefix: ''
+bands:
+        1: classtype
+        2: basalarea
+        3: biomass
+        4: canopycover
+region: noah_sample_region
+years:
+        - '2016'
+        - '2018'
+variables:
+        - biomass
+        - basalarea
+        - canopycover
+zoom:
+        - 0
+        - 13
+ramp: viridis
+c_levels: 7
+bounds: 
+        - 0
+        - 15
+        - 30
+        - 50
+        - 65
+        - 80
+        - 100
+geojson: us2.geojson
+
