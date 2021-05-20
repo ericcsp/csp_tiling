@@ -16,7 +16,7 @@ def list_files(**kw):
                          '-c',
                          kw['src_container'],
                          '--account-key',
-                         os.env['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
+                         os.environ['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
   return [fil["name"] for fil in yaml.safe_load(result.stdout)]
 
 def get_files(**kw):
@@ -27,7 +27,7 @@ def get_files(**kw):
                               'blob',
                               'download',
                               '-f',
-                              fil.replace(kw["src_folder"], kw["local_folder"],
+                              fil.replace(kw["src_folder"], kw["local_folder"]),
                               '-n',
                               fil,
                               '--account-name',
@@ -35,4 +35,4 @@ def get_files(**kw):
                               '-c',
                               kw['src_container'],
                               '--account-key',
-                              os.env['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
+                              os.environ['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)

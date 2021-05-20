@@ -7,6 +7,7 @@ class Full_Img:
         self.img = rasterio.open(self.fname)
         self.bands = kw["bands"]
         self.year = kw["this_yr"]
+        self.folder = kw["local_folder"]
         self.children = {}
 
     def make_children(self):
@@ -30,7 +31,7 @@ class Band_Img:
         self.meta = self.parent.img.meta.copy()
         self.data = self.parent.img.read(self.index)
         self.scale = self.parent.img.scales[self.index-1]
-        self.outname = f'{kw["local_folder"}/{self.parent.year}/{self.band_name}/{self.parent.fname[:-4]}_{self.band_name}.tif'
+        self.outname = f'{self.parent.folder}/{self.parent.year}/{self.band_name}/{self.parent.fname.split("/")[-1][:-4]}_{self.band_name}.tif'
 
     def newimg(self):
         self.meta.update({"count": 1, "dtype": self.data.dtype,

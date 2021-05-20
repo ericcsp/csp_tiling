@@ -5,4 +5,3 @@ def make_tiles(**kw):
     tile_cmd = f'python3 gdal2tiles-leaflet/gdal2tiles.py -z {kw["zoom"][0]}-{kw["zoom"][1]} {kw["clipped_fn"]} {tilesdir}'
     p = subprocess.Popen(tile_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     p.communicate()
-    return tilesdir

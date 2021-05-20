@@ -31,5 +31,5 @@ bounds:
         - 65
         - 80
         - 100
-geojson: us2.geojson
+geojson: csp_tiling/us2.geojson
 

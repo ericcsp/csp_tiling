@@ -13,5 +13,5 @@ def upload(**kw):
                               '--account-name',
                               kw['account'],
                               '--account-key',
-                              os.env['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
+                              os.environ['AZURE_ACCOUNT_KEY']], stdout=subprocess.PIPE)
 
